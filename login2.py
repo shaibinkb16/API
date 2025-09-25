@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Annotated, List
+from typing import Annotated
 from contextlib import asynccontextmanager
 import jwt
 from fastapi import Depends, FastAPI, HTTPException, status, Form
@@ -54,7 +54,7 @@ class TokenData(BaseModel):
     email: str | None = None
 
 class Progress(BaseModel):
-    completed_slides: List[int]
+    completed_slides: int
     total_login_time: float
     login_count: int
     status: str
@@ -108,7 +108,7 @@ async def authenticate_user(email: Annotated[str, Form()]):
         user = {
             "_id": user_id,
             "email": email,
-            "completed_slides": [0],  # start with 0
+            "completed_slides": 0,  # start with 0
             "total_login_time": 0.0,
             "login_count": 1,
             "status": "in_progress",
@@ -153,11 +153,11 @@ async def end_slide(
     total_time = user.get("total_login_time", 0.0) + login_time
 
     # ✅ Only keep the maximum slide number
-    current_max = max(user.get("completed_slides", [0]))
+    current_max = user.get("completed_slides", 0)
     if slide_id > current_max:
-        completed_slides = [slide_id]
+        completed_slides = slide_id
     else:
-        completed_slides = [current_max]
+        completed_slides = current_max
 
     users_collection.update_one(
         {"email": current_user.email},
@@ -188,7 +188,7 @@ async def get_progress(current_user: Annotated[TokenData, Depends(get_current_us
         raise HTTPException(status_code=404, detail="User not found")
     
     return Progress(
-        completed_slides=user.get("completed_slides", []),
+        completed_slides=user.get("completed_slides", 0),
         total_login_time=user.get("total_login_time", 0.0),
         login_count=user.get("login_count", 0),
         status=user.get("status", "in_progress")
