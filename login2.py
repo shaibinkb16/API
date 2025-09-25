@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, List
 from contextlib import asynccontextmanager
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, status, Form, Request
+from fastapi import Depends, FastAPI, HTTPException, status, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from pymongo import MongoClient
@@ -13,7 +13,10 @@ import os
 # ==============================
 # MongoDB Atlas Connection
 # ==============================
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://shaibinkb16_db_user:Shaibin@cluster0.rpxtsc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+MONGO_URI = os.getenv(
+    "MONGO_URI",
+    "mongodb+srv://shaibinkb16_db_user:Shaibin@cluster0.rpxtsc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+)
 client = MongoClient(MONGO_URI)
 db = client["posh"]
 users_collection = db["users"]
@@ -27,14 +30,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     try:
         client.admin.command("ping")
-        print("Successfully connected to MongoDB Atlas!")
+        print("✅ Successfully connected to MongoDB Atlas!")
     except ConnectionFailure as e:
-        print("MongoDB connection failed:", e)
+        print("❌ MongoDB connection failed:", e)
     yield
-    # Shutdown (if needed)
 
 app = FastAPI(title="POSH Training Auth API", lifespan=lifespan)
 
@@ -89,14 +90,13 @@ async def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, 
 async def health_check():
     try:
         client.admin.command("ping")
-        return {"status": "ok", "message": "MongoDB connected"}
+        return {"status": "ok", "message": "MongoDB connected ✅"}
     except ConnectionFailure:
-        raise HTTPException(status_code=500, detail="MongoDB not connected")
+        raise HTTPException(status_code=500, detail="MongoDB not connected ❌")
 
 # ==============================
 # Endpoints
 # ==============================
-
 @app.post("/auth", response_model=Token)
 async def authenticate_user(email: Annotated[str, Form()]):
     user = users_collection.find_one({"email": email})
@@ -108,7 +108,7 @@ async def authenticate_user(email: Annotated[str, Form()]):
         user = {
             "_id": user_id,
             "email": email,
-            "completed_slides": [],
+            "completed_slides": [0],  # start with 0
             "total_login_time": 0.0,
             "login_count": 1,
             "status": "in_progress",
@@ -151,10 +151,14 @@ async def end_slide(
     
     end_time = datetime.utcnow()
     total_time = user.get("total_login_time", 0.0) + login_time
-    completed_slides = user.get("completed_slides", [])
-    if slide_id not in completed_slides:
-        completed_slides.append(slide_id)
-    
+
+    # ✅ Only keep the maximum slide number
+    current_max = max(user.get("completed_slides", [0]))
+    if slide_id > current_max:
+        completed_slides = [slide_id]
+    else:
+        completed_slides = [current_max]
+
     users_collection.update_one(
         {"email": current_user.email},
         {"$set": {
@@ -175,7 +179,7 @@ async def finish_training(current_user: Annotated[TokenData, Depends(get_current
         {"email": current_user.email},
         {"$set": {"status": "completed", "finished_at": datetime.utcnow()}}
     )
-    return {"message": "Training completed"}
+    return {"message": "Training completed ✅"}
 
 @app.get("/progress", response_model=Progress)
 async def get_progress(current_user: Annotated[TokenData, Depends(get_current_user)]):
