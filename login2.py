@@ -142,14 +142,21 @@ async def start_slide(
 @app.post("/progress/end")
 async def end_slide(
     current_user: Annotated[TokenData, Depends(get_current_user)],
-    slide_id: Annotated[int, Form()],
-    login_time: Annotated[float, Form()]
+    slide_id: Annotated[int, Form()]
 ):
     user = users_collection.find_one({"email": current_user.email})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     end_time = datetime.utcnow()
+    
+    # Calculate login time automatically
+    start_time = user.get("start_time")
+    if start_time:
+        login_time = (end_time - start_time).total_seconds() / 60  # in minutes
+    else:
+        login_time = 0.0
+
     total_time = user.get("total_login_time", 0.0) + login_time
 
     # ✅ Only keep the maximum slide number

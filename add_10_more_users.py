@@ -13,39 +13,38 @@ client = MongoClient(MONGO_URI)
 db = client["posh"]
 users_collection = db["users"]
 
-def generate_demo_users():
+def generate_additional_users():
     demo_users = []
 
-    # Sample email domains and names
-    first_names = ["John", "Jane", "Mike", "Sarah", "David", "Emma", "Chris", "Lisa", "Alex", "Maria",
-                   "Tom", "Anna", "Steve", "Kate", "Mark", "Amy", "Paul", "Nina", "Jake", "Lucy",
-                   "Ryan", "Sophie", "Ben", "Grace", "Matt", "Olivia", "Dan", "Zoe", "Sam", "Chloe"]
-    last_names = ["Smith", "Johnson", "Brown", "Davis", "Wilson", "Miller", "Moore", "Taylor", "Anderson", "Thomas",
-                  "Jackson", "White", "Harris", "Martin", "Garcia", "Rodriguez", "Lewis", "Lee", "Walker", "Hall",
-                  "Young", "King", "Wright", "Lopez", "Hill", "Scott", "Green", "Adams", "Baker", "Nelson"]
-    domains = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "company.com"]
+    # Additional names for the 10 new users
+    additional_users = [
+        ("Oliver", "Carter"), ("Isabella", "Mitchell"), ("William", "Perez"),
+        ("Sophia", "Roberts"), ("James", "Turner"), ("Charlotte", "Phillips"),
+        ("Benjamin", "Campbell"), ("Amelia", "Parker"), ("Lucas", "Evans"),
+        ("Harper", "Edwards")
+    ]
 
-    for i in range(30):
-        first_name = first_names[i]
-        last_name = last_names[i]
+    domains = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "company.com", "edu.org"]
+
+    for first_name, last_name in additional_users:
         domain = random.choice(domains)
         email = f"{first_name.lower()}.{last_name.lower()}@{domain}"
 
         # Random progress data
         completed_slides = random.randint(0, 15)  # 0-15 slides completed
-        login_count = random.randint(1, 10)
-        total_login_time = round(random.uniform(5.0, 120.0), 2)  # 5 minutes to 2 hours
+        login_count = random.randint(1, 12)
+        total_login_time = round(random.uniform(3.0, 150.0), 2)  # 3 minutes to 2.5 hours
 
         # Random status based on progress
         if completed_slides == 0:
             status = "in_progress"
-        elif completed_slides >= 12:
+        elif completed_slides >= 13:
             status = "completed"
         else:
             status = random.choice(["in_progress", "in_progress", "completed"])
 
         # Random timestamps
-        start_time = datetime.utcnow() - timedelta(days=random.randint(1, 30))
+        start_time = datetime.now() - timedelta(days=random.randint(1, 45))
         end_time = start_time + timedelta(minutes=total_login_time) if status == "completed" else None
         finished_at = end_time if status == "completed" else None
 
@@ -65,9 +64,9 @@ def generate_demo_users():
 
     return demo_users
 
-def insert_demo_data():
-    print("Generating demo users...")
-    demo_users = generate_demo_users()
+def add_10_more_users():
+    print("Generating 10 additional demo users...")
+    demo_users = generate_additional_users()
 
     print("Connecting to MongoDB...")
     try:
@@ -77,22 +76,27 @@ def insert_demo_data():
         print("MongoDB connection failed:", e)
         return
 
-    # Keep existing data - only add new users
-    print("Adding to existing users...")
+    print("Getting current user count...")
+    current_count = users_collection.count_documents({})
+    print(f"Current users in database: {current_count}")
 
-    print("Inserting demo users...")
+    print("Inserting 10 additional demo users...")
     result = users_collection.insert_many(demo_users)
-    print(f"Successfully inserted {len(result.inserted_ids)} demo users!")
+    print(f"Successfully inserted {len(result.inserted_ids)} additional demo users!")
 
-    # Display summary
-    print("\nDemo Data Summary:")
-    print(f"Total users: {users_collection.count_documents({})}")
-    print(f"Completed: {users_collection.count_documents({'status': 'completed'})}")
-    print(f"In Progress: {users_collection.count_documents({'status': 'in_progress'})}")
+    # Display updated summary
+    print("\nUpdated Demo Data Summary:")
+    total_users = users_collection.count_documents({})
+    completed_users = users_collection.count_documents({'status': 'completed'})
+    in_progress_users = users_collection.count_documents({'status': 'in_progress'})
 
-    print("\nSample users:")
-    for user in users_collection.find().limit(5):
+    print(f"Total users: {total_users}")
+    print(f"Completed: {completed_users}")
+    print(f"In Progress: {in_progress_users}")
+
+    print("\nNew users added:")
+    for user in demo_users:
         print(f"{user['email']} - Slides: {user['completed_slides']} - Status: {user['status']}")
 
 if __name__ == "__main__":
-    insert_demo_data()
+    add_10_more_users()
