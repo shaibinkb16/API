@@ -1,7 +1,7 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-python-multipart==0.0.9
-PyJWT==2.9.0
-SQLAlchemy==2.0.35
-pydantic==2.8.2
-requests==2.31.0
+fastapi
+uvicorn
+python-multipart
+PyJWT
+SQLAlchemy
+pydantic
+requests    
