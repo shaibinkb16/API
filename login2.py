@@ -43,7 +43,7 @@ app = FastAPI(title="POSH Training Auth API", lifespan=lifespan)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+    allow_origins=["*",
         "http://localhost:3000",  # For local development
         "https://posh-training.s3.eu-north-1.amazonaws.com",  # Your frontend URL
     ],
