@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import jwt
 from fastapi import Depends, FastAPI, HTTPException, status, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -38,6 +39,18 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="POSH Training Auth API", lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # For local development
+        "https://posh-training.s3.eu-north-1.amazonaws.com",  # Your frontend URL
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 # ==============================
 # Security
