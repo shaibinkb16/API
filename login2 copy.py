@@ -21,7 +21,6 @@ MONGO_URI = os.getenv(
 client = MongoClient(MONGO_URI)
 db = client["posh"]
 users_collection = db["users"]
-authorized_emails_collection = db["authorized_emails"]
 
 # ==============================
 # JWT Config
@@ -34,9 +33,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 async def lifespan(app: FastAPI):
     try:
         client.admin.command("ping")
-        print("Successfully connected to MongoDB Atlas!")
+        print("✅ Successfully connected to MongoDB Atlas!")
     except ConnectionFailure as e:
-        print("MongoDB connection failed:", e)
+        print("❌ MongoDB connection failed:", e)
     yield
 
 app = FastAPI(title="POSH Training Auth API", lifespan=lifespan)
@@ -73,31 +72,9 @@ class Progress(BaseModel):
     login_count: int
     status: str
 
-class ErrorResponse(BaseModel):
-    error: bool
-    error_code: str
-    message: str
-    details: str
-    suggestions: list[str]
-
 # ==============================
 # Utility Functions
 # ==============================
-def is_email_authorized(email: str) -> tuple[bool, str]:
-    """
-    Check if an email is in the authorized_emails collection
-    Returns: (is_authorized: bool, name: str)
-    """
-    try:
-        result = authorized_emails_collection.find_one({"email": email.lower()})
-        if result:
-            return True, result["name"]
-        else:
-            return False, ""
-    except Exception as e:
-        print(f"Error checking email authorization: {e}")
-        return False, ""
-
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=15))
@@ -126,32 +103,15 @@ async def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, 
 async def health_check():
     try:
         client.admin.command("ping")
-        return {"status": "ok", "message": "MongoDB connected"}
+        return {"status": "ok", "message": "MongoDB connected ✅"}
     except ConnectionFailure:
-        raise HTTPException(status_code=500, detail="MongoDB not connected")
+        raise HTTPException(status_code=500, detail="MongoDB not connected ❌")
 
 # ==============================
 # Endpoints
 # ==============================
-@app.post("/auth")
+@app.post("/auth", response_model=Token)
 async def authenticate_user(email: Annotated[str, Form()]):
-    # First, check if email is authorized
-    is_authorized, name = is_email_authorized(email)
-    if not is_authorized:
-        return {
-            "error": True,
-            "error_code": "EMAIL_NOT_AUTHORIZED",
-            "message": "Access Denied",
-            "details": f"The email '{email}' is not authorized to access this POSH training system.",
-            "suggestions": [
-                "Please check if you entered the correct email address",
-                "Contact your HR department or training administrator",
-                "Ensure you are using your official company email",
-                "If you believe this is an error, please contact support"
-            ]
-        }
-
-    # Proceed with existing logic if email is authorized
     user = users_collection.find_one({"email": email})
     if user:
         login_count = user["login_count"] + 1
@@ -161,7 +121,6 @@ async def authenticate_user(email: Annotated[str, Form()]):
         user = {
             "_id": user_id,
             "email": email,
-            "name": name,  # Add the name from authorized_emails
             "completed_slides": 0,  # start with 0
             "total_login_time": 0.0,
             "login_count": 1,
@@ -175,15 +134,7 @@ async def authenticate_user(email: Annotated[str, Form()]):
     access_token = create_access_token(
         data={"email": email}, expires_delta=access_token_expires
     )
-    return {
-        "error": False,
-        "access_token": access_token,
-        "token_type": "bearer",
-        "email": email,
-        "login_count": login_count,
-        "message": "Authentication successful",
-        "user_name": name
-    }
+    return {"access_token": access_token, "token_type": "bearer", "email": email, "login_count": login_count}
 
 @app.post("/progress/start")
 async def start_slide(
@@ -262,16 +213,6 @@ async def get_progress(current_user: Annotated[TokenData, Depends(get_current_us
         login_count=user.get("login_count", 0),
         status=user.get("status", "in_progress")
     )
-
-@app.get("/check-email/{email}")
-async def check_email_authorization(email: str):
-    """Check if an email is authorized (for admin purposes)"""
-    is_authorized, name = is_email_authorized(email)
-    return {
-        "email": email,
-        "is_authorized": is_authorized,
-        "name": name if is_authorized else None
-    }
 
 # ==============================
 # Run App
