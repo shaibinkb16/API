@@ -2,14 +2,16 @@ from datetime import datetime, timedelta
 from typing import Annotated
 from contextlib import asynccontextmanager
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, status, Form
+from fastapi import Depends, FastAPI, HTTPException, status, Form, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import uuid
 import os
+import re
 
 # ==============================
 # MongoDB Atlas Connection
@@ -40,6 +42,55 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="POSH Training Auth API", lifespan=lifespan)
+
+# ==============================
+# Custom Exception Handler
+# ==============================
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Custom exception handler to return consistent error format
+    """
+    if exc.status_code == 401:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "error": True,
+                "error_code": "UNAUTHORIZED",
+                "message": "Unauthorized Access",
+                "details": exc.detail,
+                "suggestions": [
+                    "Ensure you are logged in with a valid token",
+                    "Your session may have expired - please login again",
+                    "Check that the Authorization header is properly set"
+                ]
+            }
+        )
+    elif exc.status_code == 404:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": True,
+                "error_code": "NOT_FOUND",
+                "message": "Resource Not Found",
+                "details": exc.detail,
+                "suggestions": [
+                    "Check the URL you are trying to access",
+                    "Ensure the resource exists"
+                ]
+            }
+        )
+    else:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": True,
+                "error_code": f"HTTP_{exc.status_code}",
+                "message": exc.detail,
+                "details": exc.detail,
+                "suggestions": []
+            }
+        )
 
 # Add CORS middleware
 app.add_middleware(
@@ -83,6 +134,13 @@ class ErrorResponse(BaseModel):
 # ==============================
 # Utility Functions
 # ==============================
+def is_valid_email(email: str) -> bool:
+    """
+    Validate email format using regex
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(email_pattern, email) is not None
+
 def is_email_authorized(email: str) -> tuple[bool, str]:
     """
     Check if an email is in the authorized_emails collection
@@ -135,7 +193,21 @@ async def health_check():
 # ==============================
 @app.post("/auth")
 async def authenticate_user(email: Annotated[str, Form()]):
-    # First, check if email is authorized
+    # First, validate email format
+    if not is_valid_email(email):
+        return {
+            "error": True,
+            "error_code": "INVALID_EMAIL_FORMAT",
+            "message": "Invalid Email Format",
+            "details": f"The email '{email}' is not in a valid format.",
+            "suggestions": [
+                "Please enter a valid email address (e.g., user@example.com)",
+                "Check for typos in your email address",
+                "Ensure the email contains '@' and a valid domain"
+            ]
+        }
+
+    # Check if email is authorized
     is_authorized, name = is_email_authorized(email)
     if not is_authorized:
         return {
@@ -278,4 +350,4 @@ async def check_email_authorization(email: str):
 # ==============================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
